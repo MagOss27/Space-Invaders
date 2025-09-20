@@ -97,5 +97,5 @@ class Player {
     }
 
 }
-2;
+
 export default Player;
