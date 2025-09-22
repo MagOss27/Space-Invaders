@@ -99,6 +99,14 @@ const isTouchDevice = () => {
   return "ontouchstart" in window || navigator.maxTouchPoints > 0;
 };
 
+// ---------- Limite de invaders no mobile ----------
+const getMaxInvaders = () => {
+    if (isTouchDevice()) {
+        return { maxRows: 4, maxCols: 5 }; // limite para mobile
+    }
+    return { maxRows: 9, maxCols: 9 }; // desktop normal
+};
+
 const createMobileControls = () => {
   if (!isTouchDevice()) return;
 
@@ -262,13 +270,15 @@ const checkShootObstacles = () => {
 const spawnGrid = () => {
     if (grid.invaders.length === 0) {
         soundEffects.playNextLevelSound()
-        grid.rows = Math.round(Math.random() * 9 + 1)
-        grid.cols = Math.round(Math.random() * 9 + 1)
-        grid.restart()
+        const { maxRows, maxCols } = getMaxInvaders();
+        grid.rows = Math.min(Math.round(Math.random() * 9 + 1), maxRows);
+        grid.cols = Math.min(Math.round(Math.random() * 9 + 1), maxCols);
+        grid.restart();
 
-        gameData.level += 1
+        gameData.level += 1;
     }
 }
+
 
 const gameOver = () => {
     createExplosion(
