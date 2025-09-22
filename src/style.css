@@ -91,3 +91,36 @@ canvas {
         scale: 1;
     }
 }
+
+/* MOBILE CONTROLS */
+.mobile-controls{
+  position: fixed;
+  bottom: 18px;
+  left: 0;
+  right: 0;
+  display:flex;
+  justify-content:center;
+  gap: 12px;
+  z-index: 999;
+  pointer-events: auto;
+  padding: 0 12px;
+}
+
+.mobile-controls button{
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(221,221,221,0.95);
+  font-size: 28px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  user-select: none;
+}
+
+/* Hide controls on large screens */
+@media (min-width: 768px){
+  .mobile-controls{ display: none; }
+}

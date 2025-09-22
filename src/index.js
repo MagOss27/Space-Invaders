@@ -21,10 +21,55 @@ gameOverScreen.remove()
 const canvas = document.querySelector("canvas");
 const ctx = canvas.getContext("2d");
 
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+// ---------- PLAYER & GRID (necessário para setCanvasSize) ----------
+const player = new Player(window.innerWidth, window.innerHeight);
+const grid = new Grid(3, 6);
 
-ctx.imageSmoothingEnabled = false;
+const playerProjectiles = [];
+const invadersProjectiles = [];
+const particles = [];
+const obstacles = [];
+
+const initObstacles = () => {
+    const x = canvas.width / 2 - 50;
+    const y = canvas.height - 250;
+    const offset = canvas.width * 0.15;
+
+    const obstacle1 = new Obstacle({ x: x - offset, y }, 100, 20, "#800000");
+    const obstacle2 = new Obstacle({ x: x + offset, y }, 100, 20, "#800000");
+
+    obstacles.push(obstacle1);
+    obstacles.push(obstacle2);
+}
+
+initObstacles();
+
+// ---------- RESPONSIVE CANVAS (DPR safe) ----------
+const setCanvasSize = () => {
+  const dpr = window.devicePixelRatio || 1;
+  const cssWidth = window.innerWidth;
+  const cssHeight = window.innerHeight;
+
+  canvas.style.width = `${cssWidth}px`;
+  canvas.style.height = `${cssHeight}px`;
+
+  canvas.width = Math.floor(cssWidth * dpr);
+  canvas.height = Math.floor(cssHeight * dpr);
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+
+  player.position.x = cssWidth / 2 - player.width / 2;
+  player.position.y = cssHeight - player.height - 30;
+
+  obstacles.length = 0;
+  initObstacles();
+};
+
+setCanvasSize();
+window.addEventListener("resize", setCanvasSize);
+window.addEventListener("orientationchange", setCanvasSize);
+// ---------------------------------------------------
 
 let currentState = GameState.START
 
@@ -40,29 +85,6 @@ const showGameData = () => {
     highElement.textContent = gameData.high;
 };
 
-const player = new Player(canvas.width, canvas.height);
-const grid = new Grid(3, 6);
-
-const playerProjectiles = [];
-const invadersProjectiles = [];
-const particles = []
-const obstacles = []
-
-const initObstacles = () => {
-    const x = canvas.width / 2 - 50
-    const y = canvas.height - 250
-    const offset = canvas.width * 0.15
-    const color = "crimson"
-
-    const obstacle1 = new Obstacle({ x: x - offset, y }, 100, 20, "#800000")
-    const obstacle2 = new Obstacle({ x: x + offset, y }, 100, 20, "#800000")
-
-    obstacles.push(obstacle1)
-    obstacles.push(obstacle2)
-}
-
-initObstacles()
-
 const keys = {
     left: false,
     right: false,
@@ -71,6 +93,48 @@ const keys = {
         released: true,
     },
 };
+
+// ---------- MOBILE CONTROLS ----------
+const isTouchDevice = () => {
+  return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+};
+
+const createMobileControls = () => {
+  if (!isTouchDevice()) return;
+
+  const controls = document.createElement("div");
+  controls.className = "mobile-controls";
+  controls.innerHTML = `
+    <button class="mc-left" aria-label="left">◀</button>
+    <button class="mc-shoot" aria-label="shoot">●</button>
+    <button class="mc-right" aria-label="right">▶</button>
+  `;
+  document.body.appendChild(controls);
+
+  const leftBtn = controls.querySelector(".mc-left");
+  const rightBtn = controls.querySelector(".mc-right");
+  const shootBtn = controls.querySelector(".mc-shoot");
+
+  const bindPress = (el, onDown, onUp) => {
+    el.addEventListener("pointerdown", (e) => { e.preventDefault(); onDown(); });
+    el.addEventListener("pointerup", (e) => { e.preventDefault(); onUp(); });
+    el.addEventListener("pointercancel", (e) => { e.preventDefault(); onUp(); });
+    el.addEventListener("pointerleave", (e) => { e.preventDefault(); onUp(); });
+  };
+
+  bindPress(leftBtn, () => { keys.left = true; }, () => { keys.left = false; });
+  bindPress(rightBtn, () => { keys.right = true; }, () => { keys.right = false; });
+  bindPress(shootBtn,
+    () => { keys.shoot.pressed = true; keys.shoot.released = true; },
+    () => { keys.shoot.pressed = false; keys.shoot.released = true; }
+  );
+
+  canvas.style.touchAction = "none";
+};
+
+createMobileControls();
+// -------------------------------------------------------------
+
 
 const incrementScore = (value) => {
     gameData.score += value;
@@ -103,19 +167,24 @@ const drawParticles = () => {
 }
 
 const clearProjectiles = () => {
-    playerProjectiles.forEach((projectile, index) => {
-        if (projectile.position.y <= 0) {
-            playerProjectiles.splice(index, 1)
-        }
-    })
+  for (let i = playerProjectiles.length - 1; i >= 0; i--) {
+    if (playerProjectiles[i].position.y <= 0) {
+      playerProjectiles.splice(i, 1);
+    }
+  }
+  for (let i = invadersProjectiles.length - 1; i >= 0; i--) {
+    if (invadersProjectiles[i].position.y >= window.innerHeight) {
+      invadersProjectiles.splice(i, 1);
+    }
+  }
 };
 
 const clearParticles = () => {
-    particles.forEach((projectile, i) => {
-        if (particles.opacity <= 0) {
-            particles.splice(i, 1)
-        }
-    })
+  for (let i = particles.length - 1; i >= 0; i--) {
+    if (particles[i].opacity <= 0) {
+      particles.splice(i, 1);
+    }
+  }
 };
 
 const createExplosion = (position, size, color) => {
@@ -233,7 +302,8 @@ const gameOver = () => {
 }
 
 const gameLoop = () => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+// Limpa usando CSS pixels (porque usamos ctx.setTransform(dpr...))
+ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
 
     if (currentState == GameState.PLAYING) {
         showGameData()
@@ -323,19 +393,41 @@ addEventListener("keyup", (event) => {
     }
 });
 
+const unlockAudio = () => {
+  // Array com todos os áudios que você usa
+  const allSounds = [
+    ...soundEffects.shootSounds,
+    ...soundEffects.hitSounds,
+    soundEffects.explosionSound,
+    soundEffects.nextLevelSound
+  ];
+
+  // Tenta "tocar e parar" cada um
+  allSounds.forEach(audio => {
+    audio.play().then(() => {
+      audio.pause();
+      audio.currentTime = 0;
+    }).catch(() => {
+      // se não tocar (erro de autoplay), ignora
+    });
+  });
+};
+
+
 buttonPlay.addEventListener("click", () => {
-    startScreen.remove()
-    scoreUi.style.display = "block";
-    currentState = GameState.PLAYING
+  startScreen.remove();
+  scoreUi.style.display = "block";
+  currentState = GameState.PLAYING;
 
-    setInterval(() => {
-        const invader = grid.getRandonInvader()
+  unlockAudio(); // <- importante no mobile
 
-        if (invader) {
-            invader.shoot(invadersProjectiles)
-        }
-    }, 1000)
-})
+  setInterval(() => {
+    const invader = grid.getRandonInvader();
+    if (invader) {
+      invader.shoot(invadersProjectiles);
+    }
+  }, 1000);
+});
 
 buttonRestart.addEventListener("click", () => {
     currentState = GameState.PLAYING
